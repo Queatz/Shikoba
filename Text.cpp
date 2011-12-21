@@ -1,254 +1,171 @@
-struct _lineglyph {
-	_lineglyph(const Glyph * g, int a, int b) : glyph(g), x(a), y(b) {}
-	
-	const Glyph * glyph;
-	int x, y;
-};
+#define WITH_GRAPHICS
+#define WITH_SOUND
+#define WITH_NETWORK
+//#define WITH_PYTHON
+#include <scge/scge.hpp>
 
-Text::Text(Font * font, const unsigned char * utf8, float spacing, float linespacing, int align, float maxwidth, int tabwidth) {
-	_font = font;
-	
-	_maxlineadvance = 0.0;
-	
-	FT_Error err;
-	err = FT_Activate_Size(_font->_ft_size);
-	
-	if(err) {
-		printf("Bad size.\n");
-		return;
-	}
+#include <sstream>
 
-	const unsigned char * i = utf8;
-	const unsigned char * i2;
-	const unsigned char * i3;
-	uint32_t c = 0;
-	uint32_t clast = 0;
+int main(int argc, char** argv) {
+	scge::window("Hello World", 1680/2, 1050/2, false, true);
+	scge::vsync();
 	
-	const Glyph * temp;
-	const Glyph * lasttemp = 0;
+	// Shaders
 	
-	std::vector<GLushort> indicedata;
-	std::vector<GLfloat> pendata;
+	scge::shader vshader("vertex", "#version 330 core\n\
+	in vec2 vertex;\n\
+	in vec2 texcoords;\n\
+	in vec4 ink;\n\
+	\n\
+	uniform mat4 matrix;\n\
+	\n\
+	out vec2 texcoord;\n\
+	out vec4 inkcolor;\n\
+	\n\
+	void main() {\n\
+		texcoord = texcoords;\n\
+		inkcolor = ink;\n\
+	\n\
+		gl_Position = matrix * vec4(vertex, 0.0, 1.0);\n\
+	}");
 	
-	GLfloat pen_x = 0.0;
-	GLfloat pen_y = 0.0;
-	GLfloat line_pen_x = 0.0;
-	GLfloat break_pen_x = 0.0;
+	vshader.compile();
 	
-	GLsizei characters = 0;
+	scge::shader fshader("fragment", "#version 330 core\n\
+	in vec2 texcoord;\n\
+	in vec4 inkcolor;\n\
+	\n\
+	uniform sampler2D tex;\n\
+	\n\
+	out vec4 color;\n\
+	\n\
+	void main() {\n\
+		color = vec4(1.0, 1.0, 1.0, texture(tex, texcoord).r) * inkcolor;\n\
+	}");
 	
-	FT_Vector kern;
-	int has_kerning = FT_HAS_KERNING(_font->_face->_ft_face);
+	fshader.compile();
 	
-	int lines = 0;
+	scge::program fontprogram = scge::program();
 	
-	err = FT_Load_Char(_font->_face->_ft_face, (const FT_UInt)' ', FT_LOAD_DEFAULT | FT_LOAD_IGNORE_TRANSFORM);
+	fontprogram.attach(&vshader);
+	fontprogram.attach(&fshader);
 	
-	int spaceadvance = (_font->_face->_ft_face->glyph->advance.x >> 6);
-	tabwidth *= (float)spaceadvance;
+	fontprogram.attribute(0, "vertex");
+	fontprogram.attribute(1, "texcoords");
+	fontprogram.attribute(2, "ink");
 	
-	std::vector<_lineglyph> lineglyphs;
+	fontprogram.link();
 	
-	bool linebroke = false;
-	int current_word_length;
+	scge::use_program(&fontprogram);
 	
-	while(1) {
-		if(*i == 0) break;
-		i2 = i;
-		clast = c;
-		c = utf8::unchecked::next(i);
-		if(*i == 0) goto doline;
-		
-		temp = _font->glyph(c);
-		
-		if(c == '\n' || c == '\r') {
-			if(clast == '\r' && c == '\n')
-				continue;
+	// Font
+	Shikoba::Library fontlib = Shikoba::Library();
+	Shikoba::Face face1 = Shikoba::Face(&fontlib, "/usr/share/fonts/truetype/freefont/FreeSerif.ttf");
+	
+	// Setup
+	
+	scge::vao vao = scge::vao();
+	
+	scge::use_vao(&vao);
+	
+	vao.enable(0);
+	vao.enable(1);
+	vao.enable(2);
+	
+	Shikoba::Font * font1 = new Shikoba::Font(&face1, 32.0);
+	
+	float fontsize = 100.0;
+	
+	// Loop
+	
+	scge::clear_color(0., .0, .0);
+	scge::enable("cull", false);
+	
+	scge::vbo V = scge::vbo(2258 * 4 * 4 * sizeof(GLfloat), "static draw");
+	
+	{
+		scge::use_vao(&vao);
+		std::vector<GLfloat> vdas;
+		for(int i = 0; i < 2258; i++) {
+			vdas.push_back((GLfloat).6);
+			vdas.push_back((GLfloat).3);
+			vdas.push_back((GLfloat).0);
+			vdas.push_back((GLfloat)1.);
 			
-			lasttemp = NULL;
-			current_word_length = 0;
-		
-			linebroke = true;
-			goto doline;
-		}
-		else if(c == '\t') {
-			lasttemp = NULL;
-			current_word_length = 0;
-			if(clast != '\t' && clast != ' ')
-				break_pen_x = line_pen_x;
-			pen_x = (float)((int)((pen_x + tabwidth) / tabwidth)) * tabwidth * spacing;
-			i3 = i;
-			continue;
-		}
-		else if(c == ' ') {
-			lasttemp = NULL;
-			current_word_length = 0;
-			if(clast != '\t' && clast != ' ')
-				break_pen_x = line_pen_x;
-			pen_x += (float)spaceadvance * spacing;
-			i3 = i;
-			continue;
-		}
-		
-		if(has_kerning && lasttemp != NULL) {
-			err = FT_Get_Kerning(_font->_face->_ft_face, lasttemp->_glyphid, temp->_glyphid, FT_KERNING_DEFAULT, &kern);
-			if(err == 0)
-				pen_x += (float)(kern.x >> 6);
-		}
-		
-		if(maxwidth > 0.0 && !lineglyphs.empty() && pen_x + (float)(temp->_ft_advance.x >> 6) >= maxwidth) {
-			if(break_pen_x > 0.001) {
-				for(int ci = 0; ci < current_word_length; ci++)
-					lineglyphs.pop_back();
+			vdas.push_back((GLfloat)1);
+			vdas.push_back((GLfloat)1);
+			vdas.push_back((GLfloat)1);
+			vdas.push_back((GLfloat)1.);
 			
-				i = i3;
-				line_pen_x = break_pen_x;
-			} else {
-				i = i2;
-			}
-		
-			goto doline;
-		}
-		
-		lineglyphs.push_back(_lineglyph(temp, pen_x, pen_y));
-		
-		line_pen_x = pen_x + (float)(temp->_ft_advance.x >> 6);
-		pen_x += (float)(temp->_ft_advance.x >> 6) * spacing;
-		current_word_length += 1;
-		lasttemp = temp;
-		
-		continue;
-		doline:
-		
-		float lineshift, linestretch;
-		
-		if(maxwidth > 0.0 && !linebroke && align & JUSTIFY) {
-			linestretch = maxwidth / line_pen_x;
-		}
-		else {
-			linestretch = 1.0;
-		}
-		
-		if(align & LEFT) {
-			lineshift = 0.0;
-		}
-		else if(align & RIGHT) {
-			lineshift = std::floor(line_pen_x * linestretch);
-		}
-		else if(align & CENTER) {
-			lineshift = std::floor(line_pen_x * linestretch / 2.0);
-		}
-		
-		if(_maxlineadvance < line_pen_x * linestretch)
-			_maxlineadvance = line_pen_x * linestretch;
-		
-		std::vector<_lineglyph>::iterator q;
-		for(q = lineglyphs.begin(); q != lineglyphs.end(); q++) {
-			pendata.push_back(std::floor((*q).x * linestretch) + (*q).glyph->vertices[0] - lineshift);
-			pendata.push_back((*q).y + (*q).glyph->vertices[1]);
-			pendata.push_back((*q).glyph->texcoords[0]);
-			pendata.push_back((*q).glyph->texcoords[1]);
-		
-			pendata.push_back(std::floor((*q).x * linestretch) + (*q).glyph->vertices[0] - lineshift);
-			pendata.push_back((*q).y + (*q).glyph->vertices[3]);
-			pendata.push_back((*q).glyph->texcoords[0]);
-			pendata.push_back((*q).glyph->texcoords[3]);
-		
-			pendata.push_back(std::floor((*q).x * linestretch) + (*q).glyph->vertices[2] - lineshift);
-			pendata.push_back((*q).y + (*q).glyph->vertices[3]);
-			pendata.push_back((*q).glyph->texcoords[2]);
-			pendata.push_back((*q).glyph->texcoords[3]);
-		
-			pendata.push_back(std::floor((*q).x * linestretch) + (*q).glyph->vertices[2] - lineshift);
-			pendata.push_back((*q).y + (*q).glyph->vertices[1]);
-			pendata.push_back((*q).glyph->texcoords[2]);
-			pendata.push_back((*q).glyph->texcoords[1]);
-		
-			indicedata.push_back(characters * 4 + 0);
-			indicedata.push_back(characters * 4 + 1);
-			indicedata.push_back(characters * 4 + 2);
-			indicedata.push_back(characters * 4 + 0);
-			indicedata.push_back(characters * 4 + 2);
-			indicedata.push_back(characters * 4 + 3);
+			vdas.push_back((GLfloat)1);
+			vdas.push_back((GLfloat)1);
+			vdas.push_back((GLfloat)1);
+			vdas.push_back((GLfloat)1.);
 			
-			characters++;
+			vdas.push_back((GLfloat).6);
+			vdas.push_back((GLfloat).3);
+			vdas.push_back((GLfloat).0);
+			vdas.push_back((GLfloat)1.);
 		}
-		
-		lines += 1;
-		pen_x = 0.0;
-		pen_y -= (float)(_font->_ft_size->metrics.height >> 6) * linespacing;
-		break_pen_x = pen_x;
-		current_word_length = 0;
-		
-		linebroke = false;
-		
-		lineglyphs.clear();
+	
+		V.data(0, 2258 * 4 * 4 * sizeof(GLfloat), &vdas[0]);
 	}
 	
-	_lines = lines;
-	_characters = characters;
-	GLint last, last2;
-	glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &last);
-	glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &last2);
+	vao.attribute(2, &V, "float", 4);
 	
-	glGenBuffers(2, _buffers);
-	glBindBuffer(GL_ARRAY_BUFFER, _buffers[0]);
-	glBufferData(GL_ARRAY_BUFFER, _characters * 4 * (2 + 2) * sizeof(GLfloat), (const GLvoid *)&pendata[0], GL_STATIC_DRAW);
+	glm::ivec2 wd = scge::window_dimensions();
 	
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _buffers[1]);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, _characters * sizeof(GLushort) * 6, (const GLvoid *)&indicedata[0], GL_STATIC_DRAW);
+	Shikoba::Text * string = NULL;
 	
-	glBindBuffer(GL_ARRAY_BUFFER, last);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, last2);
-}
-
-Text::~Text() {
-	if(_buffers[0] && _buffers[1])
-		glDeleteBuffers(2, _buffers);
-}
-
-int Text::lines() {
-	return _lines;
-}
-
-float Text::advance() {
-	return _maxlineadvance;
-}
-
-void Text::draw(GLuint vertexattribute, GLuint texcoordattribute) {
-	// Texture
+	scge::image III = scge::image("../bin/Garden.jpg");
 	
-	GLint lasti;
-	glGetIntegerv(GL_TEXTURE_BINDING_2D, &lasti);
-	
-	glBindTexture(GL_TEXTURE_2D, _font->_textures.back());
-	
-	// Buffers
-	
-	GLint last, last2;
-	glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &last);
-	glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &last2);
-	
-	// Pen
-	if((GLuint)last != _buffers[0])
-		glBindBuffer(GL_ARRAY_BUFFER, _buffers[0]);
-	
-	// Vertex + Texcoord
-	
-	glVertexAttribPointer(vertexattribute, 2, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 4, (const GLvoid *)0);
-	glVertexAttribPointer(texcoordattribute, 2, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 4, (const GLvoid *)(sizeof(GLfloat) * 2));
-	
-	if((GLuint)last2 != _buffers[1])
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _buffers[1]);
-	
-	// Draw
-	glDrawElements(GL_TRIANGLES, _characters * 6, GL_UNSIGNED_SHORT, (const GLvoid *)0);
-	
-	// Restore
-	glBindBuffer(GL_ARRAY_BUFFER, last);
-	
-	if((GLuint)last2 != _buffers[1])
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, last2);
-	
-	glBindTexture(GL_TEXTURE_2D, lasti);
+	float charspace = 2;
+	while(!scge::key("escape") && scge::window_opened()) {
+		scge::clear();
+		wd = scge::window_dimensions();
+		scge::viewport(0, 0, wd.x, wd.y);
+		//fontprogram.uniform("matrix", glm::gtc::matrix_transform::translate(glm::ortho((float)0.0, (float)wd.x, (float)0.0, (float)wd.y, (float)-1.0, (float)1.0), glm::vec3((float) 30.0, (float) 30.0, (float) 0.0)));
+		//fontprogram.uniform("matrix", glm::ortho((float)0.0, (float)1.0, (float)0.0, (float)1.0, (float)-1.0, (float)1.0));
+		
+		//scge::use_vao(&vao);
+		//scge::use_vbo(&V);
+		//vao.attribute(0, &V, "float", 2, 0);
+		//vao.attribute(1, &V, "float", 2, 8 * sizeof(GLfloat));
+		//glBindTexture(GL_TEXTURE_2D, font1._textures.back());
+		//fontprogram.uniform("tex", 0);
+		//scge::draw("triangle fan", 4);
+		
+		//fontprogram.uniform("matrix", glm::gtc::matrix_transform::scale(glm::gtc::matrix_transform::translate(glm::ortho((float)0.0, (float)wd.x, (float)0.0, (float)wd.y, (float)-1.0, (float)1.0), glm::vec3((float) 70.0, (float) 70.0, (float) 0.0)), glm::vec3((float) 13.0, (float) 13.0, (float) 0)));
+		if(string)
+		for(int l = 0; l < 1; l++) {
+			fontprogram.uniform("matrix", glm::gtc::matrix_transform::translate(glm::ortho((float)0.0, (float)wd.x, (float)0.0, (float)wd.y, (float)-1.0, (float)1.0), glm::vec3((float) wd.x / 2.0, (float) wd.y - font1->height() - font1->height() * l * (string->lines()), (float) 0.0)));
+			string->draw(0, 1);
+		}
+		
+		GLenum err = glGetError();
+		if(err)
+			printf("0x%x\n", err);
+		scge::swap();
+		scge::poll();
+		
+		if(!font1 || scge::key("z")) {
+			fontsize += scge::key("shift") ? -1 : 1;
+			if(font1)
+				delete font1;
+			
+			printf("%f\n", fontsize);
+			font1 = new Shikoba::Font(&face1, fontsize);
+			printf("%f\n", fontsize);
+		}
+		
+		if(!string || scge::key("space") || scge::key("z")) {
+			if(scge::key("space"))
+				charspace += scge::key("shift") ? -0.1 : 0.1;
+			if(string)
+				delete string;
+			
+			string = new Shikoba::Text(font1, (const uint8_t *)"Hi",
+	1, 1, Shikoba::LEFT, charspace * 100, 8);
+		}
+	}
 }
