@@ -132,7 +132,7 @@ const Glyph * Font::glyph(const uint32_t & c) {
 	if(_glyphs.count(c) == 0) {
 		FT_Error err;
 		
-		err = FT_Load_Char(_face->_ft_face, (const FT_UInt)c, FT_LOAD_DEFAULT | FT_LOAD_IGNORE_TRANSFORM | FT_LOAD_RENDER);
+		err = FT_Load_Char(_face->_ft_face, (const FT_UInt)c, FT_LOAD_DEFAULT | FT_LOAD_IGNORE_TRANSFORM | FT_LOAD_RENDER | FT_LOAD_FORCE_AUTOHINT);
 		
 		if(err) {
 			printf("Char load fail!\n");
