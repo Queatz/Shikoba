@@ -54,7 +54,7 @@ Text::Text(Font * font, const unsigned char * utf8, float spacing, float linespa
 	
 	char ending_sequence = 0;
 	
-	while(1) {
+	while(utf8[0] != 0x0) {
 		if(ending_sequence == 1) {
 			ending_sequence = 2;
 			goto doline;
