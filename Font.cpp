@@ -1,4 +1,4 @@
-Font::Font(Face *face, float width, float height, int horizontal_dpi, int vertical_dpi) {
+Font::Font(Face *face, GLuint texID, float width, float height, int horizontal_dpi, int vertical_dpi) {
 	_face = face;
 	
 	FT_Error err;
@@ -18,59 +18,40 @@ Font::Font(Face *face, float width, float height, int horizontal_dpi, int vertic
 		return;
 	}
 	
-	GLuint texID;
-	
 	GLint last;
 	glGetIntegerv(GL_TEXTURE_BINDING_2D, &last);
 	
-	// Start with one texture; more will be added if space runs out
-	glGenTextures(1, &texID);
-	glBindTexture(GL_TEXTURE_2D, texID);
+	if((GLuint) last != texID)
+		glBindTexture(GL_TEXTURE_2D, texID);
 	
 	if(!_face->_ft_face->size) {
 		printf("Invalid font size the second generation!\n");
 		return;
 	}
 	
-	// Guess at how much space we'll need; expands when needed
-	_texture_width = _ft_size->metrics.x_ppem * 16;
-	_texture_height = _ft_size->metrics.y_ppem * 16;
+	glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &_texture_width);
+	glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &_texture_height);
 	
 	if(_texture_width == 0 || _texture_height == 0) {
-		printf("Invalid font size the third generation!\n");
+		printf("Invalid texture!\n");
 		return;
 	}
 	
-	if(_texture_width > _face->_library->_context.maximum_texture_size / 4)
-		_texture_width = _face->_library->_context.maximum_texture_size / 4;
+	GLubyte* blackpixels;
+	blackpixels = new GLubyte[_texture_width * _texture_height];
+	memset(blackpixels, 0, _texture_width * _texture_height);
+	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, _texture_width, _texture_height, GL_RED, GL_UNSIGNED_BYTE, blackpixels);
+	delete blackpixels;
 	
-	if(_texture_height > _face->_library->_context.maximum_texture_size / 4)
-		_texture_height = _face->_library->_context.maximum_texture_size / 4;
-	
-	// Causes segfaults with large sizes
-	GLubyte * data;
-	int dsize = _texture_width * _texture_height;
-	data = new GLubyte[dsize];
-	
-	int I;
-	for(I = 0; I < dsize; I++)
-		data[I] = (GLubyte)0;
-	
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, _texture_width, _texture_height, 0, GL_RED, GL_UNSIGNED_BYTE, (const GLvoid *)data);
-	glGenerateMipmap(GL_TEXTURE_2D);
-	
-	delete [] data;
-	
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	
-	glBindTexture(GL_TEXTURE_2D, last);
+	if((GLuint) last != texID)
+		glBindTexture(GL_TEXTURE_2D, last);
 	
 	// All glyphs have a 1 pixel padding
 	_texturepen_x = 1;
 	_texturepen_y = 1;
 	
 	// Tallest glyph in the current row
+	// Could check all glyphs in row and pack better...
 	_texturerow_h = 0;
 	
 	_textures.push_back(texID);
@@ -209,7 +190,7 @@ const Glyph * Font::glyph(const uint32_t & c) {
 		
 		_texturepen_x += bitmap->width + 1;
 		
-		if((unsigned int)bitmap->rows > _texturerow_h)
+		if(bitmap->rows > _texturerow_h)
 			_texturerow_h = bitmap->rows;
 	}
 	

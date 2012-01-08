@@ -99,7 +99,7 @@ struct Font {
 		[int] | DPI of surface.
 		[int] | Vertical DPI.
 	***/
-	Font(Face *, float, float = 0.0, int = 0, int = 0);
+	Font(Face *, GLuint, float, float = 0.0, int = 0, int = 0);
 	~Font();
 	
 	/***
@@ -135,11 +135,11 @@ struct Font {
 	
 	std::map<uint32_t, Glyph> _glyphs;
 	
-	unsigned int _texturepen_x;
-	unsigned int _texturepen_y;
-	unsigned int _texturerow_h;
-	unsigned int _texture_width;
-	unsigned int _texture_height;
+	GLint _texturepen_x;
+	GLint _texturepen_y;
+	GLint _texturerow_h;
+	GLint _texture_width;
+	GLint _texture_height;
 	
 	friend struct Text;
 };
