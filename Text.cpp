@@ -231,34 +231,18 @@ void Text::draw(GLuint vertexattribute, GLuint texcoordattribute) {
 	GLint lasti;
 	glGetIntegerv(GL_TEXTURE_BINDING_2D, &lasti);
 	
+	// TODO Multiple textures aren't working yet (not sure if they have to)
 	glBindTexture(GL_TEXTURE_2D, _font->_textures.back());
 	
-	// Buffers
-	
-	GLint last, last2;
-	glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &last);
-	glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &last2);
-	
-	// Pen
-	if((GLuint)last != _buffers[0])
-		glBindBuffer(GL_ARRAY_BUFFER, _buffers[0]);
-	
 	// Vertex + Texcoord
-	
+	// TODO Move this into Text::Text()
+	glBindBuffer(GL_ARRAY_BUFFER, _buffers[0]);
 	glVertexAttribPointer(vertexattribute, 2, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 4, (const GLvoid *)0);
 	glVertexAttribPointer(texcoordattribute, 2, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 4, (const GLvoid *)(sizeof(GLfloat) * 2));
 	
-	if((GLuint)last2 != _buffers[1])
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _buffers[1]);
-	
 	// Draw
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _buffers[1]);
 	glDrawElements(GL_TRIANGLES, _characters * 6, GL_UNSIGNED_SHORT, (const GLvoid *)0);
-	
-	// Restore
-	glBindBuffer(GL_ARRAY_BUFFER, last);
-	
-	if((GLuint)last2 != _buffers[1])
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, last2);
 	
 	glBindTexture(GL_TEXTURE_2D, lasti);
 }
