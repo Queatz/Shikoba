@@ -32,11 +32,11 @@ C++:
 	// See Shikoba.hpp for more details.
 	Shikoba::Font * adjusted_string = new Shikoba::Font(font,
 		(const uint8_t *) "The UTF-8 String.",
-		1.0,				# Character spacing
-		1.5,				# Line spacing
-		Shikoba::CENTER,	# Alignment
-		120,				# Page width (0 = no wrapping)
-		4					# Number of spaces a tab makes up
+		1.0,				// Character spacing
+		1.5,				// Line spacing
+		Shikoba::CENTER,	// Alignment
+		120,				// Page width (0 = no wrapping)
+		4					// Number of spaces a tab makes up
 	);
 
 	// Draw the text
