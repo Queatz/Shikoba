@@ -10,6 +10,7 @@ Quickstart
 ---------
 
 C++:
+
 ```c++
 	// Create a library
 	Shikoba::Library * fontlib = new Shikoba::Library();
