@@ -1,3 +1,5 @@
+![Shikoba!](http://queatz.com/static/Shikoba.png)
+
 Shikoba is a C++ text library for OpenGL 3 and above using the FreeType 2 library.
 
 Depends
@@ -34,4 +36,7 @@ C++:
 	// Both are a Shikoba::Box, with .x1, .y1, .x2, .y2
 	// 1 = lower left, 2 = upper right
 	// And bind the texture using the OpenGL texture id from fontlib->texture()
+	
+	// If you wanted to write out a string, advance your cursor with
+	float next_pen_x = fontlib->advance(previous_char, next_char);
 ```
