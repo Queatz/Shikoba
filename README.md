@@ -6,41 +6,31 @@ Depends
 FreeType 2  
 http://freetype.org/
 
-UTF8-CPP  
-http://utfcpp.sourceforge.net/
-
 Quickstart
 ---------
 
 C++:
-
+```c++
 	// Create a library
 	Shikoba::Library * fontlib = new Shikoba::Library();
 
 	// Create a face in the library
 	Shikoba::Face * fontface = new Shikoba::Face(fontlib, "fontfile.ttf");
 
-	// Create a sized font out of a face
-	// id_of_gl_texture is a GLuint of a texture for the font to use, created and parameterized by you
-	// Don't be changing this textures size or anything
-	Shikoba::Font * font = new Shikoba::Font(fontface, id_of_gl_texture, 32.0);
+	// Set the face to be used
+	fontlib->setFace(fontface);
 
-	// Create a string of text
-	Shikoba::Text * string = new Shikoba::Text(font, (const uint8_t *) "The UTF-8 String.");
+	// Set the face size to be used
+	fontlib->setFace(16);
 
-	// Create an adjusted string of text
-	// See Shikoba.hpp for more details.
-	Shikoba::Text * adjusted_string = new Shikoba::Text(font,
-		(const uint8_t *) "The UTF-8 String.",
-		1.0,				// Character spacing
-		1.5,				// Line spacing
-		Shikoba::CENTER,	// Alignment
-		120,				// Page width (0 = no wrapping)
-		4					// Number of spaces a tab makes up
-	);
+	// Fetch a glyph using utf-8 index
+	Shikoba::Glyph * g;
+	g = fontlib->glyph('A');
 
-	// Draw the text
-	// You set the active texture and vertex array before calling
-	// 0 and 1 are the attributes to use for vertex positions and texcoords
-	// All strings are drawn starting from (0, 0)
-	string->draw(0, 1)
+	// Do something with the glyph, like store it in a vbo
+	// g.vertices
+	// g.texcoords
+	// Both are a Shikoba::Box, with .x1, .y1, .x2, .y2
+	// 1 = lower left, 2 = upper right
+	// And bind the texture using the OpenGL texture id from fontlib->texture()
+```
