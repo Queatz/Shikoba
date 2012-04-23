@@ -46,8 +46,16 @@ struct Face {
 	Face(Library *, const char *, unsigned int = 0);
 	~Face();
 	
+	void size(unsigned int);
+	const Glyph * glyph(const uint32_t);
+	float advance(const uint32_t, const uint32_t = 0);
+	float height();
+	float ascender();
+	float descender();
+	
 	private:
 	
+	unsigned int _size;
 	FT_Face _ft_face;
 	std::map<unsigned int, std::map<uint32_t, Glyph> > _glyphs;
 	Library * _library;
@@ -67,25 +75,14 @@ struct Library {
 	***/
 	Library();
 	~Library();
-	
-	void setFace(Face* = NULL);
-	void setSize(unsigned int);
 
 	GLuint texture();
-	const Glyph * glyph(const uint32_t);
-	float advance(const uint32_t, const uint32_t = 0);
-	float height();
-	float ascender();
-	float descender();
 
 	private:
 	
 	FT_Library _ft_library;
 	Context _context;
 	GLuint _texid;
-
-	Face* _active_face;
-	unsigned int _active_size;
 
 	GLint _texturepen_x;
 	GLint _texturepen_y;
