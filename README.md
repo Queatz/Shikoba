@@ -20,15 +20,12 @@ Shikoba::Library * fontlib = new Shikoba::Library();
 // Create a face in the library
 Shikoba::Face * fontface = new Shikoba::Face(fontlib, "fontfile.ttf");
 
-// Set the face to be used
-fontlib->setFace(fontface);
-
 // Set the face size to be used
-fontlib->setSize(16);
+fontface->size(16);
 
 // Fetch a glyph using utf-8 index
 Shikoba::Glyph * g;
-g = fontlib->glyph('A');
+g = fontface->glyph('A');
 
 // Do something with the glyph, like store it in a vbo
 // g.vertices
@@ -39,5 +36,5 @@ g = fontlib->glyph('A');
 Gluint t = fontlib->texture();
 
 // If you wanted to write out a string, advance your cursor with
-float next_pen_x = fontlib->advance(previous_char, next_char);
+float next_pen_x = fontface->advance(previous_char, next_char);
 ```
