@@ -36,58 +36,25 @@ const Glyph * Face::glyph(const uint32_t c) {
 		}
 
 		GLint last;
-		glGetIntegerv(GL_TEXTURE_BINDING_2D, &last);
+		glGetIntegerv(GL_TEXTURE_BINDING_RECTANGLE, &last);
 		
 		if((GLuint)last != _library->_texid)
-			glBindTexture(GL_TEXTURE_2D, _library->_texid);
-		
-		// Insert into texture
+			glBindTexture(GL_TEXTURE_RECTANGLE, _library->_texid);
 		
 		if(_library->_texture_width == 0 || _library->_texture_height == 0) {
-			// Create texture
-
-			_library->_texture_width = 512;
-			_library->_texture_height = 512;
-
-			glGetError();
-			GLubyte* blackpixels;
-			blackpixels = new GLubyte[_library->_texture_width * _library->_texture_height];
-			memset(blackpixels, 0, _library->_texture_width * _library->_texture_height);
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, _library->_texture_width, _library->_texture_height, 0, GL_RED, GL_UNSIGNED_BYTE, blackpixels);
-			glGenerateMipmap(GL_TEXTURE_2D);
-			GLenum e;
-			e = glGetError();
-			if(e)
-				_library->_errorString = "Could not format texture\n";
-			
-			delete blackpixels;
-
-			glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &_library->_texture_width);
-			glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &_library->_texture_height);
-
-			if(_library->_texture_width == 0 || _library->_texture_height == 0) {
-				_library->_errorString = "Could not create texture.\n";
+			if(!_library->expandTexture())
 				return NULL;
-			}
-			
-			// All glyphs have a 1 pixel padding
-			_library->_texturepen_x = 1;
-			_library->_texturepen_y = 1;
-			
-			// Tallest glyph in the current row
-			// Could check all glyphs in row and pack better...
-			_library->_texturerow_h = 0;
 		}
 		
-		// Shortcut
 		FT_Bitmap * bitmap = &_ft_face->glyph->bitmap;
 		
-		if(_library->_texturepen_x + bitmap->width > _library->_texture_width) {
+		if(_library->_texturepen_x + bitmap->width + 1 > _library->_texture_width) {
 			_library->_texturepen_y += _library->_texturerow_h + 1;
 			_library->_texturepen_x = 1;
+			_library->_texturerow_h = 0;
 			
-			if(_library->_texturepen_y + bitmap->rows > _library->_texture_height - 1) {
-				_library->_errorString = "Texture overflow.\n";
+			if(_library->_texturepen_y + bitmap->rows + 1 > _library->_texture_height) {
+				_library->expandTexture();
 			}
 		}
 		
@@ -105,7 +72,7 @@ const Glyph * Face::glyph(const uint32_t c) {
 		if(uplast != 1)
 			glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
-		glTexSubImage2D(GL_TEXTURE_2D, 0, _library->_texturepen_x, _library->_texturepen_y, bitmap->width, bitmap->rows, GL_RED, GL_UNSIGNED_BYTE, data);
+		glTexSubImage2D(GL_TEXTURE_RECTANGLE, 0, _library->_texturepen_x, _library->_texturepen_y, bitmap->width, bitmap->rows, GL_RED, GL_UNSIGNED_BYTE, data);
 		
 		delete [] data;
 		
@@ -113,7 +80,7 @@ const Glyph * Face::glyph(const uint32_t c) {
 			glPixelStorei(GL_UNPACK_ALIGNMENT, uplast);
 		
 		if((GLuint)last != _library->_texid)
-			glBindTexture(GL_TEXTURE_2D, last);
+			glBindTexture(GL_TEXTURE_RECTANGLE, last);
 		
 		Glyph * g = &_glyphs[_size][c];
 		
@@ -122,17 +89,15 @@ const Glyph * Face::glyph(const uint32_t c) {
 		g->_ft_metrics = _ft_face->glyph->metrics;
 		g->_ft_advance = _ft_face->glyph->advance;
 		
-		g->vertices.x1 = (float)_ft_face->glyph->bitmap_left - .5;
-		g->vertices.y1 = -((float)bitmap->rows - (float)_ft_face->glyph->bitmap_top) - .5;
-		g->vertices.x2 = (float)bitmap->width + (float)_ft_face->glyph->bitmap_left + .5;
-		g->vertices.y2 = -((float)bitmap->rows - (float)_ft_face->glyph->bitmap_top) + (float)bitmap->rows + .5;
+		g->vertices[0] = (GLfloat)_ft_face->glyph->bitmap_left - 0.5;
+		g->vertices[1] = -(GLfloat)bitmap->rows + (GLfloat)_ft_face->glyph->bitmap_top - 0.5;
+		g->vertices[2] = (GLfloat)bitmap->width + (GLfloat)_ft_face->glyph->bitmap_left + 0.5;
+		g->vertices[3] = -(GLfloat)bitmap->rows + (GLfloat)_ft_face->glyph->bitmap_top + (GLfloat)bitmap->rows + 0.5;
 		
-		g->texcoords.x1 = (((float)_library->_texturepen_x) - .5) / (float)_library->_texture_width;
-		g->texcoords.y1 = (((float)_library->_texturepen_y) - .5) / (float)_library->_texture_height;
-		g->texcoords.x2 = ((float)(_library->_texturepen_x + bitmap->width) + .5) / (float)_library->_texture_width;
-		g->texcoords.y2 = ((float)(_library->_texturepen_y + bitmap->rows) + .5) / (float)_library->_texture_height;
-		
-		// Ready for next character when needed
+		g->texcoords[0] = (GLfloat)_library->_texturepen_x - 0.5;
+		g->texcoords[1] = (GLfloat)_library->_texturepen_y - 0.5;
+		g->texcoords[2] = (GLfloat)_library->_texturepen_x + (GLfloat)bitmap->width + 0.5;
+		g->texcoords[3] = (GLfloat)_library->_texturepen_y + (GLfloat)bitmap->rows + 0.5;
 		
 		_library->_texturepen_x += bitmap->width + 1;
 		
@@ -143,26 +108,26 @@ const Glyph * Face::glyph(const uint32_t c) {
 	return &_glyphs[_size][c];
 }
 
-float Face::advance(const uint32_t lg, const uint32_t rg) {
+GLfloat Face::advance(const uint32_t lg, const uint32_t rg) {
 	if(rg && FT_HAS_KERNING(_ft_face)) {
 		FT_Vector kern;
 		FT_Get_Kerning(_ft_face, lg, rg, FT_KERNING_DEFAULT, &kern);
-		return (float)(glyph(lg)->_ft_advance.x >> 6) + (float)(kern.x >> 6);
+		return (GLfloat)(glyph(lg)->_ft_advance.x >> 6) + (GLfloat)(kern.x >> 6);
 	}
 	else
-		return (float)(glyph(lg)->_ft_advance.x >> 6);
+		return (GLfloat)(glyph(lg)->_ft_advance.x >> 6);
 }
 
-float Face::height() {
-	return (float)(_ft_face->size->metrics.height >> 6);
+GLfloat Face::height() {
+	return (GLfloat)(_ft_face->size->metrics.height >> 6);
 }
 
-float Face::ascender() {
-	return (float)(_ft_face->size->metrics.ascender >> 6);
+GLfloat Face::ascender() {
+	return (GLfloat)(_ft_face->size->metrics.ascender >> 6);
 }
 
-float Face::descender() {
-	return (float)(_ft_face->size->metrics.descender >> 6);
+GLfloat Face::descender() {
+	return (GLfloat)(_ft_face->size->metrics.descender >> 6);
 }
 
 
@@ -203,6 +168,57 @@ Library::~Library() {
 }
 
 GLuint Library::texture() { return _texid; }
+
+GLboolean Library::expandTexture() {
+	if(_texture_height == _context.maximum_texture_size) {
+		_errorString = "Texture overflow.\n";
+		return GL_FALSE;
+	}
+	
+	if(_texture_width == 0 || _texture_height == 0) {
+		_texture_width = _context.maximum_texture_size;
+		_texture_height = 128;
+
+		glGetError();
+		glTexImage2D(GL_TEXTURE_RECTANGLE, 0, GL_R8, _texture_width, _texture_height, 0, GL_RED, GL_UNSIGNED_BYTE, NULL);
+		GLenum e;
+		e = glGetError();
+		if(e)
+			_errorString = "Could not format texture.\n";
+
+		glGetTexLevelParameteriv(GL_TEXTURE_RECTANGLE, 0, GL_TEXTURE_WIDTH, &_texture_width);
+		glGetTexLevelParameteriv(GL_TEXTURE_RECTANGLE, 0, GL_TEXTURE_HEIGHT, &_texture_height);
+
+		if(_texture_width == 0 || _texture_height == 0) {
+			_errorString = "Could not create texture.\n";
+			return GL_FALSE;
+		}
+	
+		_texturepen_x = 1;
+		_texturepen_y = 1;
+		_texturerow_h = 0;
+	}
+	else {
+		GLubyte * cbuf = new GLubyte[_texture_width * _texture_height];
+		
+		glGetTexImage(GL_TEXTURE_RECTANGLE, 0, GL_RED, GL_UNSIGNED_BYTE, cbuf);
+		
+		GLint th = _texture_height;
+		_texture_height *= 2;
+		if(_texture_height > _context.maximum_texture_size)
+			_texture_height = _context.maximum_texture_size;
+		
+		glTexImage2D(GL_TEXTURE_RECTANGLE, 0, GL_R8, _texture_width, _texture_height, 0, GL_RED, GL_UNSIGNED_BYTE, NULL);
+		glTexSubImage2D(GL_TEXTURE_RECTANGLE, 0, 0, 0, _texture_width, th, GL_RED, GL_UNSIGNED_BYTE, cbuf);
+
+		glGetTexLevelParameteriv(GL_TEXTURE_RECTANGLE, 0, GL_TEXTURE_WIDTH, &_texture_width);
+		glGetTexLevelParameteriv(GL_TEXTURE_RECTANGLE, 0, GL_TEXTURE_HEIGHT, &_texture_height);
+		
+		delete [] cbuf;
+	}
+	
+	return GL_TRUE;
+}
 
 const char * Library::getErrorString() {
 	const char * err = _errorString;

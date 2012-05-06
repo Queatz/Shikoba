@@ -20,16 +20,9 @@ namespace Shikoba {
 struct Library;
 struct Face;
 
-struct Box {
-	GLfloat x1;
-	GLfloat y1;
-	GLfloat x2;
-	GLfloat y2;
-};
-
 struct Glyph {
-	Box vertices;
-	Box texcoords;
+	GLfloat vertices[4];
+	GLfloat texcoords[4];
 	FT_Glyph_Metrics _ft_metrics;
 	FT_Vector _ft_advance;
 	FT_UInt _glyphid;
@@ -38,20 +31,15 @@ struct Glyph {
 /* Face */
 
 struct Face {
-	/***
-	Create a face from a font file.
-		const char * | File.
-		[unsigned int] | Face in the file.
-	***/
 	Face(Library *, const char *, unsigned int = 0);
 	~Face();
 	
 	void size(unsigned int);
 	const Glyph * glyph(const uint32_t);
-	float advance(const uint32_t, const uint32_t = 0);
-	float height();
-	float ascender();
-	float descender();
+	GLfloat advance(const uint32_t, const uint32_t = 0);
+	GLfloat height();
+	GLfloat ascender();
+	GLfloat descender();
 	
 	private:
 	
@@ -70,9 +58,6 @@ struct Context {
 };
 
 struct Library {
-	/***
-	Create a library.
-	***/
 	Library();
 	~Library();
 
@@ -80,6 +65,8 @@ struct Library {
 	const char * getErrorString();
 
 	private:
+	
+	GLboolean expandTexture();
 	
 	FT_Library _ft_library;
 	Context _context;
