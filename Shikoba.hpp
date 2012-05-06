@@ -15,6 +15,8 @@ typedef unsigned int uint32_t;
 #include <vector>
 #include <map>
 
+#define SHIKOBA_VERSION 0.1
+
 namespace Shikoba {
 
 struct Library;
