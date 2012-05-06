@@ -77,12 +77,15 @@ struct Library {
 	~Library();
 
 	GLuint texture();
+	const char * getErrorString();
 
 	private:
 	
 	FT_Library _ft_library;
 	Context _context;
 	GLuint _texid;
+	
+	const char * _errorString;
 
 	GLint _texturepen_x;
 	GLint _texturepen_y;

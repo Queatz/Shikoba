@@ -35,6 +35,9 @@ g = fontface->glyph('A');
 // And bind the texture using the OpenGL texture id of the library:
 Gluint t = fontlib->texture();
 
+// Check for any errors
+const char * err = fontlib->getErrorString();
+
 // If you wanted to write out a string, advance your cursor with
 float next_pen_x = fontface->advance(previous_char, next_char);
 ```

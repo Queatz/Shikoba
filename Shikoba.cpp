@@ -10,7 +10,7 @@ Face::Face(Library * lib, const char * filepath, unsigned int index) {
 	err = FT_New_Face(_library->_ft_library, filepath, index, &_ft_face);
 
 	if(err) {
-		printf("Shikoba: Could not load (sad) face. :(\n");
+		_library->_errorString = "Could not load face.\n";
 		return;
 	}
 }
@@ -31,7 +31,7 @@ const Glyph * Face::glyph(const uint32_t c) {
 		err = FT_Load_Char(_ft_face, (const FT_UInt)c, FT_LOAD_DEFAULT | FT_LOAD_IGNORE_TRANSFORM | FT_LOAD_RENDER | FT_LOAD_FORCE_AUTOHINT);
 		
 		if(err) {
-			printf("Shikoba: Char load fail!\n");
+			_library->_errorString = "Char load failed.\n";
 			return NULL;
 		}
 
@@ -57,16 +57,16 @@ const Glyph * Face::glyph(const uint32_t c) {
 			glGenerateMipmap(GL_TEXTURE_2D);
 			GLenum e;
 			e = glGetError();
-			if(e) {
-				printf("Shikoba: Could not format texture: %u\n", e);
-			}
+			if(e)
+				_library->_errorString = "Could not format texture\n";
+			
 			delete blackpixels;
 
 			glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &_library->_texture_width);
 			glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &_library->_texture_height);
 
 			if(_library->_texture_width == 0 || _library->_texture_height == 0) {
-				printf("Shikoba: Could not found texture! %u\n", glGetError());
+				_library->_errorString = "Could not create texture.\n";
 				return NULL;
 			}
 			
@@ -87,7 +87,7 @@ const Glyph * Face::glyph(const uint32_t c) {
 			_library->_texturepen_x = 1;
 			
 			if(_library->_texturepen_y + bitmap->rows > _library->_texture_height - 1) {
-				printf("Shikoba: Texture overflow...FIXME\n");
+				_library->_errorString = "Texture overflow.\n";
 			}
 		}
 		
@@ -166,20 +166,19 @@ float Face::descender() {
 }
 
 
-Library::Library() : _texid(0), _texture_width(0), _texture_height(0) {
+Library::Library() : _texid(0), _texture_width(0), _texture_height(0), _errorString(0) {
 	FT_Error err;
 	err = FT_Init_FreeType(&_ft_library);
 
-	if(err) {
-		printf("Shikoba: Could not initialize library.\n");
-	}
+	if(err)
+		_errorString = "Could not initialize library.\n";
 	
 	GLint i;
 	glGetIntegerv(GL_MAX_TEXTURE_SIZE, &i);
 	_context.maximum_texture_size = (GLuint)i;
 	
 	if(_context.maximum_texture_size == 0)
-		printf("Shikoba: Invalid context! Be wary!");
+		_errorString = "Invalid context! Be wary!\n";
 		
 	glGetError();
 
@@ -187,9 +186,8 @@ Library::Library() : _texid(0), _texture_width(0), _texture_height(0) {
 
 	GLenum e;
 	e = glGetError();
-	if(e) {
-		printf("Shikoba: Could not create a texture: %u\n", e);
-	}
+	if(e)
+		_errorString = "Could not create a texture.\n";
 }
 
 Library::~Library() {
@@ -199,12 +197,17 @@ Library::~Library() {
 
 		glDeleteTextures(1, &_texid);
 
-		if(err) {
-			printf("Shikoba: Could not historate library.\n");
-		}
+		if(err)
+			_errorString = "Could not historate library.\n";
 	}
 }
 
 GLuint Library::texture() { return _texid; }
+
+const char * Library::getErrorString() {
+	const char * err = _errorString;
+	_errorString = NULL;
+	return err;
+}
 
 } // namespace Shikoba
