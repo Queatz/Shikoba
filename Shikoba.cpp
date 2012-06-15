@@ -179,8 +179,11 @@ GLboolean Library::expandTexture() {
 		_texture_width = _context.maximum_texture_size;
 		_texture_height = 128;
 
+		GLubyte * data = new GLubyte[_texture_width * _texture_height];
+		memset(data, 0, _texture_width * _texture_height);
+
 		glGetError();
-		glTexImage2D(GL_TEXTURE_RECTANGLE, 0, GL_R8, _texture_width, _texture_height, 0, GL_RED, GL_UNSIGNED_BYTE, NULL);
+		glTexImage2D(GL_TEXTURE_RECTANGLE, 0, GL_R8, _texture_width, _texture_height, 0, GL_RED, GL_UNSIGNED_BYTE, data);
 		GLenum e;
 		e = glGetError();
 		if(e)
@@ -207,8 +210,11 @@ GLboolean Library::expandTexture() {
 		_texture_height *= 2;
 		if(_texture_height > _context.maximum_texture_size)
 			_texture_height = _context.maximum_texture_size;
+
+		GLubyte * data = new GLubyte[_texture_width * _texture_height];
+		memset(data, 0, _texture_width * _texture_height);
 		
-		glTexImage2D(GL_TEXTURE_RECTANGLE, 0, GL_R8, _texture_width, _texture_height, 0, GL_RED, GL_UNSIGNED_BYTE, NULL);
+		glTexImage2D(GL_TEXTURE_RECTANGLE, 0, GL_R8, _texture_width, _texture_height, 0, GL_RED, GL_UNSIGNED_BYTE, data);
 		glTexSubImage2D(GL_TEXTURE_RECTANGLE, 0, 0, 0, _texture_width, th, GL_RED, GL_UNSIGNED_BYTE, cbuf);
 
 		glGetTexLevelParameteriv(GL_TEXTURE_RECTANGLE, 0, GL_TEXTURE_WIDTH, &_texture_width);
