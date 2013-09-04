@@ -2,10 +2,10 @@
 typedef unsigned int uint32_t;
 #include <GL/glew.h>
 #else
-#ifndef GL3_PROTOTYPES
-#define GL3_PROTOTYPES
+#ifndef GL_GLEXT_PROTOTYPES
+#define GL_GLEXT_PROTOTYPES
 #endif
-#include <GL3/gl3.h>
+#include <GL/glcorearb.h>
 #endif
 
 #include <ft2build.h>
